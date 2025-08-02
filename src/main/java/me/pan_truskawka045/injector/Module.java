@@ -19,7 +19,7 @@ public abstract class Module {
     private final Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
 
     @Setter
-    private Injector injector;
+    private volatile Injector injector;
 
     /**
      * Called when the module is registered to perform any initialization logic.

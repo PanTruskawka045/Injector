@@ -5,6 +5,7 @@ import me.pan_truskawka045.injector.util.ReflectionUtil;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,9 +37,13 @@ public class Injector {
      *
      * @param module the module to register
      */
-    public synchronized void registerModule(Module module) {
-        modules.add(module);
-        module.setInjector(this);
+    public void registerModule(Module module) {
+        synchronized(this) {
+            modules.add(module);
+            module.setInjector(this);
+        }
+        // Call init() outside synchronized block to prevent deadlock
+        // if init() calls back into injector methods
         module.init();
     }
 
@@ -97,7 +102,13 @@ public class Injector {
      * Injects dependencies into all registered objects.
      */
     public synchronized void injectAll() {
-        modules.forEach(module -> {
+        // Create a safe copy of modules to avoid ConcurrentModificationException
+        List<Module> modulesCopy;
+        synchronized(modules) {
+            modulesCopy = new ArrayList<>(modules);
+        }
+
+        modulesCopy.forEach(module -> {
             if (module instanceof DefaultModule) {
                 return;
             }
@@ -115,7 +126,13 @@ public class Injector {
      * Calls all {@link Init}-annotated methods on all registered objects.
      */
     public synchronized void initAll() {
-        modules.forEach(module -> {
+        // Create a safe copy of modules to avoid ConcurrentModificationException
+        List<Module> modulesCopy;
+        synchronized(modules) {
+            modulesCopy = new ArrayList<>(modules);
+        }
+
+        modulesCopy.forEach(module -> {
             if (module instanceof DefaultModule) {
                 return;
             }
