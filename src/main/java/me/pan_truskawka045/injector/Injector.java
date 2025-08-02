@@ -5,23 +5,30 @@ import me.pan_truskawka045.injector.util.ReflectionUtil;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
+ * Thread-safe dependency injection container for managing object creation, injection, and initialization.
  * Dependency injection container for managing object creation, injection, and initialization.
- * Supports registering modules, injecting dependencies into fields, and invoking post-injection methods.
  */
 @SuppressWarnings("unused")
 @Log4j2
 public class Injector {
 
-    private final LinkedList<Module> modules = new LinkedList<>();
+    private final List<Module> modules = Collections.synchronizedList(new LinkedList<>());
     private final Module module = new DefaultModule();
 
     public Injector() {
         registerModule(module);
-        module.register(this);
+        // Register the injector AFTER construction is complete
+        // This prevents 'this' reference escape during construction
+        synchronized(this) {
+            module.register(this);
+        }
     }
 
     /**
@@ -29,7 +36,7 @@ public class Injector {
      *
      * @param module the module to register
      */
-    public void registerModule(Module module) {
+    public synchronized void registerModule(Module module) {
         modules.add(module);
         module.setInjector(this);
         module.init();
@@ -42,7 +49,7 @@ public class Injector {
      * @param <T>    the type of the object
      * @return the injected object
      */
-    public <T> T inject(T object) {
+    public synchronized <T> T inject(T object) {
         if (object == null) {
             return null;
         }
@@ -67,7 +74,7 @@ public class Injector {
      * @param <T>    the type of the object
      * @return the initialized object
      */
-    public <T> T init(T object) {
+    public synchronized <T> T init(T object) {
         if (object == null) {
             return null;
         }
@@ -89,7 +96,7 @@ public class Injector {
     /**
      * Injects dependencies into all registered objects.
      */
-    public void injectAll() {
+    public synchronized void injectAll() {
         modules.forEach(module -> {
             if (module instanceof DefaultModule) {
                 return;
@@ -107,7 +114,7 @@ public class Injector {
     /**
      * Calls all {@link Init}-annotated methods on all registered objects.
      */
-    public void initAll() {
+    public synchronized void initAll() {
         modules.forEach(module -> {
             if (module instanceof DefaultModule) {
                 return;
@@ -137,7 +144,7 @@ public class Injector {
      * @param <T>    the type of the object
      * @return the registered object
      */
-    public <T> T register(T object) {
+    public synchronized <T> T register(T object) {
         return module.register(object);
     }
 
@@ -149,7 +156,7 @@ public class Injector {
      * @param <T>       the type of the object
      * @return the registered object
      */
-    public <T> T register(T object, Class<?>... bindClazz) {
+    public synchronized <T> T register(T object, Class<?>... bindClazz) {
         return module.register(object, bindClazz);
     }
 
@@ -162,7 +169,7 @@ public class Injector {
      * @param <T>               the type of the object
      * @return the registered object
      */
-    public <T> T register(T object, boolean registerBaseClass, Class<?>... bindClazz) {
+    public synchronized <T> T register(T object, boolean registerBaseClass, Class<?>... bindClazz) {
         return module.register(object, registerBaseClass, bindClazz);
     }
 
@@ -173,7 +180,7 @@ public class Injector {
      * @param <T>   the type of the object
      * @return the created and registered object
      */
-    public <T> T create(Class<T> clazz) {
+    public synchronized <T> T create(Class<T> clazz) {
         return module.create(clazz);
     }
 
@@ -185,10 +192,12 @@ public class Injector {
      * @return the found instance or null if not found
      */
     @SuppressWarnings("unchecked")
-    public <T> T find(Class<T> clazz) {
+    public synchronized <T> T find(Class<T> clazz) {
         for (Module module1 : modules) {
-            if (module1.getInstances().containsKey(clazz)) {
-                return (T) module1.getInstances().get(clazz);
+            Map<Class<?>, Object> instances = module1.getInstances();
+            Object instance = instances.get(clazz);
+            if (instance != null) {
+                return (T) instance;
             }
         }
         return null;

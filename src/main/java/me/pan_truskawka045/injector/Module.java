@@ -1,24 +1,22 @@
 package me.pan_truskawka045.injector;
 
-import lombok.AccessLevel;
-import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 
 import java.lang.reflect.Constructor;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Abstract base class for dependency injection modules.
  * Modules manage object registration, creation, and binding for the injector.
+ * This class is thread-safe.
  */
 @Log4j2
 public abstract class Module {
 
-    @Getter(AccessLevel.PROTECTED)
-    private final Map<Class<?>, Object> instances = new LinkedHashMap<>();
+    private final Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
 
     @Setter
     private Injector injector;
@@ -37,7 +35,7 @@ public abstract class Module {
      * @param <T>               the type of the object
      * @return the registered object
      */
-    public <T> T register(T object, boolean registerBaseClass, Class<?>... bindClazz) {
+    public synchronized <T> T register(T object, boolean registerBaseClass, Class<?>... bindClazz) {
         if (object.getClass().isAnnotationPresent(Bind.class)) {
             Bind bind = object.getClass().getAnnotation(Bind.class);
             if (bind.registerBaseClass()) {
@@ -66,7 +64,7 @@ public abstract class Module {
      * @param <T>       the type of the object
      * @return the registered object
      */
-    public <T> T register(T object, Class<?>... bindClazz) {
+    public synchronized <T> T register(T object, Class<?>... bindClazz) {
         return register(object, false, bindClazz);
     }
 
@@ -77,7 +75,7 @@ public abstract class Module {
      * @param <T>    the type of the object
      * @return the registered object
      */
-    public <T> T register(T object) {
+    public synchronized <T> T register(T object) {
         if (object.getClass().isAnnotationPresent(Bind.class)) {
             Bind bind = object.getClass().getAnnotation(Bind.class);
             if (bind.registerBaseClass()) {
@@ -101,7 +99,7 @@ public abstract class Module {
      */
     @SuppressWarnings("unchecked")
     @SneakyThrows
-    public <T> T create(Class<T> clazz) {
+    public synchronized <T> T create(Class<T> clazz) {
         Constructor<?>[] declaredConstructors = clazz.getDeclaredConstructors();
         if (declaredConstructors.length == 0) {
             log.error("No constructors found for class {}", clazz.getName());
@@ -131,8 +129,17 @@ public abstract class Module {
      *
      * @param module the submodule to register
      */
-    public void registerSubmodule(Module module) {
+    public synchronized void registerSubmodule(Module module) {
         injector.registerModule(module);
     }
 
+    /**
+     * Returns a thread-safe snapshot of all registered instances.
+     * This method is safe to iterate over even while registrations are happening.
+     *
+     * @return a snapshot of the instances map
+     */
+    protected synchronized Map<Class<?>, Object> getInstances() {
+        return Map.copyOf(instances);
+    }
 }
