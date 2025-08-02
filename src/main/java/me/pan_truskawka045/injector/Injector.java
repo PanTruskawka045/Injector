@@ -5,7 +5,6 @@ import me.pan_truskawka045.injector.util.ReflectionUtil;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -102,13 +101,7 @@ public class Injector {
      * Injects dependencies into all registered objects.
      */
     public synchronized void injectAll() {
-        // Create a safe copy of modules to avoid ConcurrentModificationException
-        List<Module> modulesCopy;
-        synchronized(modules) {
-            modulesCopy = new ArrayList<>(modules);
-        }
-
-        modulesCopy.forEach(module -> {
+        modules.forEach(module -> {
             if (module instanceof DefaultModule) {
                 return;
             }
@@ -126,13 +119,7 @@ public class Injector {
      * Calls all {@link Init}-annotated methods on all registered objects.
      */
     public synchronized void initAll() {
-        // Create a safe copy of modules to avoid ConcurrentModificationException
-        List<Module> modulesCopy;
-        synchronized(modules) {
-            modulesCopy = new ArrayList<>(modules);
-        }
-
-        modulesCopy.forEach(module -> {
+        modules.forEach(module -> {
             if (module instanceof DefaultModule) {
                 return;
             }
